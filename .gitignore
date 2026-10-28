@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+.scanner_cache/
+scans/
+shortlist.csv
+all_results.csv
