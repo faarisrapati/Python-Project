@@ -10,7 +10,6 @@ import yfinance as yf
 
 
 # Edit this list to choose which stocks to scan.
-# These are example stocks across several sectors, not buy recommendations.
 TICKERS = [
     # Technology and semiconductors
     "AAPL", "MSFT", "NVDA", "AVGO", "AMD", "GOOGL", "META", "CRM", "ORCL", "ADBE",
@@ -20,7 +19,7 @@ TICKERS = [
     "JPM", "BAC", "GS", "V", "MA", "AXP",
     # Healthcare
     "LLY", "JNJ", "ABBV", "MRK", "UNH", "AMGN",
-    # Energy, industry, and other sectors
+    # Energy, industry
     "XOM", "CVX", "CAT", "DE", "GE", "HON", "PG", "KO", "PEP", "NEE",
 ]
 
@@ -33,7 +32,6 @@ RVOL_TARGET = 1.5
 
 def analyze_stock(stock_data, ticker):
     """Calculate indicators and give one point for each bullish condition."""
-    # Missing prices/volumes cannot be used to calculate reliable indicators.
     stock_data = stock_data.dropna(subset=["Close", "Volume"]).copy()
     stock_data = stock_data[(stock_data["Close"] > 0) & (stock_data["Volume"] >= 0)]
     stock_data = stock_data.sort_index()

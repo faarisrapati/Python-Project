@@ -1,7 +1,6 @@
 # Simple stock screener
 
 Scan a fixed list of 40 stocks across several sectors with Yahoo Finance.
-The stock list is a starting point you can edit, not a list of recommended buys.
 
 ```sh
 python -m pip install -r requirements.txt
@@ -42,9 +41,3 @@ through one download call; Yahoo/network delays can still affect runtime.
 The code has three functions: `analyze_stock` calculates signals, `show_results`
 prints and saves the rankings, and `main` downloads data and runs the scan.
 Comments explain each step. There are no command-line options to configure.
-
-Run the offline checks with:
-
-```sh
-python -m unittest discover -s tests -v
-```
