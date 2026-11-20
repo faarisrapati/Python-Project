@@ -1,5 +1,3 @@
-"""A small Yahoo Finance stock screener. Run it with: python main.py"""
-
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -13,7 +11,6 @@ import yfinance as yf
 from universe import load_constituents
 
 
-# Change these settings without having to change the rest of the program.
 TOP_RESULTS = 10
 MIN_PRICE = 5
 MIN_AVG_VOLUME = 300_000
@@ -21,41 +18,36 @@ RVOL_TARGET = 1.5
 
 
 def analyze_stock(stock_data, ticker):
-    """Calculate indicators and give one point for each bullish condition."""
+    """Score a stock using its daily price history."""
     stock_data = stock_data.dropna(subset=["Close", "Volume"]).copy()
     stock_data = stock_data[(stock_data["Close"] > 0) & (stock_data["Volume"] >= 0)]
     stock_data = stock_data.sort_index()
     stock_data = stock_data[~stock_data.index.duplicated(keep="last")]
     if len(stock_data) < 201:
-        return None  # The longest EMA needs 200 trading days to get started.
+        return None  # 200 days for EMA200, plus the previous close.
 
-    # Exclude old histories, such as a stock that has stopped trading.
     today = datetime.now(ZoneInfo("America/New_York")).date()
     age = (today - stock_data.index[-1].date()).days
     if age < 0 or age > 10:
         return None
 
-    # EMAs give more weight to recent prices and help identify the trend.
     for period in [20, 50, 100, 200]:
         stock_data[f"EMA_{period}"] = ta.EMA(stock_data["Close"], timeperiod=period)
 
-    # RSI measures momentum. We look for strength without an extreme reading.
     stock_data["RSI"] = ta.RSI(stock_data["Close"], timeperiod=14)
 
-    # MACD above its signal line suggests positive momentum.
     stock_data["MACD"], stock_data["MACD_SIGNAL"], _ = ta.MACD(stock_data["Close"])
 
-    # Compare the latest volume with the PREVIOUS 20 days, excluding that day.
+    # Leave the latest day out of the volume average.
     avg_volume = stock_data["Volume"].iloc[-21:-1].mean()
     latest = stock_data.iloc[-1]
     previous = stock_data.iloc[-2]
     if avg_volume <= 0 or pd.isna(latest[["EMA_200", "RSI", "MACD", "MACD_SIGNAL"]]).any():
         return None
     if latest["Close"] < MIN_PRICE or avg_volume < MIN_AVG_VOLUME:
-        return None  # Skip stocks below our price or trading-volume minimums.
+        return None
     rvol = latest["Volume"] / avg_volume
 
-    # Each condition is worth one point, for a maximum score of four.
     trend_pass = (
         latest["Close"] > latest["EMA_20"] > latest["EMA_50"]
         > latest["EMA_100"] > latest["EMA_200"]
@@ -64,7 +56,6 @@ def analyze_stock(stock_data, ticker):
     volume_pass = rvol >= RVOL_TARGET
     macd_pass = latest["MACD"] > latest["MACD_SIGNAL"]
 
-    # Keeping the checks in a dictionary makes the score and explanation agree.
     checks = {"Uptrend": trend_pass, "RSI": rsi_pass,
               "Volume": volume_pass, "MACD": macd_pass}
     score = 0
@@ -98,13 +89,13 @@ def analyze_stock(stock_data, ticker):
 
 
 def save_results(rankings, shortlist, scan_date, output_dir):
-    """Save latest copies, daily snapshots, and one row per scan day and ticker."""
+    """Save the scan and update daily history."""
     output_dir = Path(output_dir)
     daily_dir = output_dir / "scans" / scan_date
     daily_dir.mkdir(parents=True, exist_ok=True)
     history_path = output_dir / "scans" / "history.csv"
 
-    # Read history before writing anything, so an unreadable archive is preserved.
+    # Don't overwrite saved results if the history can't be read.
     history = pd.read_csv(history_path, keep_default_na=False) if history_path.exists() else pd.DataFrame()
     if not history.empty:
         if not {"Scan Date", "Ticker"}.issubset(history.columns):
@@ -118,7 +109,7 @@ def save_results(rankings, shortlist, scan_date, output_dir):
     for folder in [output_dir, daily_dir]:
         rankings.to_csv(folder / "all_results.csv", index=False, float_format="%.2f")
         shortlist.to_csv(folder / "shortlist.csv", index=False, float_format="%.2f")
-    # Replace the history only after its complete contents have been written.
+    # A failed write shouldn't leave a half-written history file.
     temporary_path = history_path.with_suffix(".tmp")
     history.to_csv(temporary_path, index=False, float_format="%.2f")
     temporary_path.replace(history_path)
@@ -128,9 +119,7 @@ def save_results(rankings, shortlist, scan_date, output_dir):
 
 
 def prepare_results(results, *, scan_date=None):
-    """Build the same rankings for the terminal and dashboard."""
     scan_date = scan_date or datetime.now(ZoneInfo("America/New_York")).date().isoformat()
-    # Sort by score first. Relative volume breaks ties between equal scores.
     rankings = pd.DataFrame(results).sort_values(
         ["Score", "RVOL", "Ticker"], ascending=[False, False, True]
     )
@@ -152,7 +141,6 @@ def prepare_results(results, *, scan_date=None):
 
 
 def show_results(results, *, scan_date=None, output_dir="."):
-    """Display a readable shortlist and retain daily results across runs."""
     if not results:
         print("No usable results. Check the download messages or try again later.")
         return
@@ -173,7 +161,7 @@ def show_results(results, *, scan_date=None, output_dir="."):
     else:
         print(f"SHORTLIST: {len(shortlist)} stocks scored at least 3/4")
 
-    # Format only the display; keep numeric columns numeric in the CSV files.
+    # Keep CSV values numeric; format a separate copy for the terminal.
     columns = ["Ticker", "Price", "Change %", "Score", "Rating", "RSI", "RVOL", "Signals"]
     display = shortlist[columns].copy()
     display.insert(0, "#", range(1, len(display) + 1))
@@ -196,16 +184,15 @@ def show_results(results, *, scan_date=None, output_dir="."):
 
 
 def run_scan(tickers, *, metadata=None, progress=None, output_dir=".", batch_size=40):
-    """Download in bounded batches; return results and reasons for every skipped stock."""
+    """Return scored stocks and a reason for each skipped symbol."""
     tickers = list(dict.fromkeys(tickers))
     if batch_size < 1:
         raise ValueError("Batch size must be positive")
-    # Yahoo's local cache avoids fetching the same timezone information repeatedly.
     cache = Path(output_dir) / ".scanner_cache/yfinance"
     cache.mkdir(parents=True, exist_ok=True)
     yf.set_tz_cache_location(str(cache))
 
-    # Excluding today's date avoids signals based on an unfinished trading session.
+    # Use completed sessions only.
     today = datetime.now(ZoneInfo("America/New_York")).date().isoformat()
     results = []
     skipped = {}
@@ -240,7 +227,6 @@ def run_scan(tickers, *, metadata=None, progress=None, output_dir=".", batch_siz
 
 
 def save_scan_report(skipped, *, requested, universe, output_dir="."):
-    """Retain scan coverage so a partial scan is visible on the dashboard."""
     report = {
         "Completed": datetime.now(ZoneInfo("America/New_York")).isoformat(timespec="seconds"),
         "Universe": universe, "Requested": requested, "Skipped": skipped,

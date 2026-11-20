@@ -1,5 +1,3 @@
-"""S&P 500 membership snapshot with an explicit online refresh."""
-
 from io import StringIO
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -20,7 +18,7 @@ def validate_constituents(frame):
     frame = frame[required].copy()
     if frame.isna().any().any() or not 450 <= len(frame) <= 550:
         raise ValueError("The membership file does not look like a complete S&P 500 list.")
-    # Yahoo uses BRK-B and BF-B rather than the exchange's dotted notation.
+    # Yahoo expects BRK-B rather than BRK.B.
     frame["Symbol"] = frame["Symbol"].str.strip().str.replace(".", "-", regex=False)
     if frame["Symbol"].duplicated().any() or not frame["Symbol"].str.fullmatch(r"[A-Z0-9-]+").all():
         raise ValueError("The membership file contains duplicate or invalid symbols.")
@@ -28,7 +26,7 @@ def validate_constituents(frame):
 
 
 def load_constituents(*, refresh=False, path=CONSTITUENTS_PATH):
-    """Use the bundled list offline; replace it only after a valid refresh."""
+    """Load the saved list, or download a fresh copy."""
     path = Path(path)
     if refresh:
         request = Request(CONSTITUENTS_URL, headers={"User-Agent": "StockScreener/1.0"})

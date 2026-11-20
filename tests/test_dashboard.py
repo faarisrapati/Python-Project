@@ -1,5 +1,3 @@
-"""Exercise the local dashboard without live market requests."""
-
 from contextlib import redirect_stdout
 import io
 from pathlib import Path

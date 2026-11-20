@@ -1,5 +1,3 @@
-"""Run with: python -m streamlit run dashboard.py"""
-
 from contextlib import redirect_stdout
 from datetime import datetime
 import io

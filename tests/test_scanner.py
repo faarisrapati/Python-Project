@@ -1,4 +1,3 @@
-"""Small offline checks for the screener's calculations and shortlist."""
 from contextlib import redirect_stdout
 from datetime import datetime
 import io
@@ -16,7 +15,7 @@ import main as scanner
 
 
 def sample_history(days=250):
-    # Use recent dates so the scanner accepts this made-up price history.
+    # Fixed dates would eventually fail the stale-data check.
     today = datetime.now(ZoneInfo("America/New_York")).date()
     dates = pd.bdate_range(end=pd.Timestamp(today) - pd.Timedelta(days=1), periods=days)
     x = np.arange(days, dtype=float)

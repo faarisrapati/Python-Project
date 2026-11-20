@@ -1,8 +1,8 @@
-# Installed Python environment (recreated from requirements.txt)
+# Python environments
 /.venv/
 /venv/
 
-# Generated Python files and test/tool caches
+# Python and test caches
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -11,22 +11,20 @@ __pycache__/
 .coverage.*
 htmlcov/
 
-# Scanner downloads and generated results (keep your history locally)
+# Local scan data
 /.scanner_cache/
 /scans/
 /shortlist.csv
 /all_results.csv
 /sp500_constituents.tmp
 
-# Local secrets (keep .streamlit/config.toml and example env files in Git)
+# Secrets
 .env
 .env.*
 !.env.example
 !.env.sample
 /.streamlit/secrets.toml
 
-# macOS metadata and logs
+# macOS files and logs
 .DS_Store
 *.log
-
-# Keep application code, tests/, and sp500_constituents.csv in Git.
